@@ -3,3 +3,4 @@ fastparquet
 torch
 matplotlib
 seaborn
+visualtorch
