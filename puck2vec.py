@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchview import draw_graph
 
 class Puck2Vec(nn.Module):
-    def __init__(self,  n_players, player_dim,n_frames,players_frame=11 ,transformer_dim=512 ,trans_layers=3 ,trans_heads=8, moves=12 ,*args, **kwargs) -> None: # type: ignore
+    def __init__(self,  n_players, player_dim,n_frames,players_frame=11 ,transformer_dim=512 ,trans_layers=3 ,trans_heads=8, moves=11 ,*args, **kwargs) -> None: # type: ignore
         super().__init__(*args, **kwargs)
         self.n_frames = n_frames
         self.d=transformer_dim
