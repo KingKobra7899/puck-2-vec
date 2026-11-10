@@ -69,7 +69,7 @@ class Puck2Vec(nn.Module):
         # paper's mask: seq is, per frame, [puck, pos_1, look_1, ..., pos_K, look_K], then K start tokens
         L = self.n_frames * (2 * self.players_frame + 1)
         S = L + self.players_frame
-        mask = torch.ones(S, S, dtype=torch.bool, device=self.f.device).triu(1)  # causal
+        mask = torch.ones(S, S, dtype=torch.bool, device=self.frame_idx.device).triu(1)  # causal # type: ignore
         mask[:, L:] = False     # every token sees the start tokens (initial state)
         mask[L:, :L] = True     # start tokens only see each other
         return mask

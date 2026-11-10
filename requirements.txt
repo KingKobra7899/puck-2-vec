@@ -3,4 +3,4 @@ fastparquet
 torch
 matplotlib
 seaborn
-visualtorch
+visualtorchscikit-learn
