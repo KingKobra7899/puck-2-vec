@@ -1,2 +1,4 @@
 data/
-puck2vec.pt
+puck2vec.pth
+/.venv
+/__pycache__
