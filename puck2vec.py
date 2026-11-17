@@ -4,13 +4,13 @@ from torchview import draw_graph
 
 
 class Puck2Vec(nn.Module):
-    def __init__(self, n_players, player_dim, n_frames, players_frame=11, transformer_dim=512, trans_layers=3, trans_heads=8, moves=11, *args, **kwargs) -> None:  # type: ignore
+    def __init__(self, player_dim, n_frames, players_frame=11, transformer_dim=512, trans_layers=3, trans_heads=8, moves=11, *args, **kwargs) -> None:  # type: ignore
         super().__init__(*args, **kwargs)
         self.n_frames = n_frames
         self.d = transformer_dim
         self.moves = moves
         self.players_frame = players_frame
-        self.player_embeddings = nn.Embedding(n_players, player_dim)
+
         self.positional_embeddings = nn.Embedding(
             5, player_dim
         )  # typical embeddings for each position, lw, rw, c, d, g
@@ -92,7 +92,7 @@ class Puck2Vec(nn.Module):
         puck_x,
         puck_y,
     ):
-        emb = self.player_embeddings(playerIds) + self.positional_embeddings(player_pos)
+        emb = self.positional_embeddings(player_pos)
         emb = emb[:, None].expand(-1, self.n_frames, -1, -1)
         pos_token = self.position_mlp(
             torch.cat([emb, torch.stack([player_x, player_y, off], -1)], -1)
@@ -153,7 +153,7 @@ class Puck2Vec(nn.Module):
 
 
 if __name__ == "__main__":
-    model = Puck2Vec(n_players=900, player_dim=32, n_frames=10, transformer_dim=256)
+    model = Puck2Vec(player_dim=32, n_frames=10, transformer_dim=256)
 
     B, T, K = 8, 10, 11
     inputs = (
