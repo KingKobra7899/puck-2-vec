@@ -51,9 +51,6 @@ class Puck2Vec(nn.Module):
         self.movement_head = nn.Sequential(
             nn.Linear(transformer_dim, 256), nn.ReLU(), nn.Linear(256, self.moves**2)
         )
-        self.epv_head = nn.Sequential(
-            nn.Linear(transformer_dim, 256), nn.ReLU(), nn.Linear(256, 1)
-        )
 
         self.f = torch.arange(n_frames).repeat_interleave(
             players_frame
@@ -63,7 +60,6 @@ class Puck2Vec(nn.Module):
         self.register_buffer("puck_frame_idx", self.fp)
         fh = torch.cat([self.f, self.fp])  # history seq: [players | puck]
         self.register_buffer("history_mask", fh[None, :] > fh[:, None])
-
         self.trans = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(transformer_dim, trans_heads, batch_first=True),
             trans_layers,
@@ -147,9 +143,8 @@ class Puck2Vec(nn.Module):
             torch.cat([pos_token.flatten(1, 2), puck_token], dim=1),
             mask=self.history_mask,
         )[:, :n].reshape(-1, self.n_frames, self.players_frame, self.d)
-        v_logits = self.epv_head(o.mean(2))
 
-        return move_logits, v_logits
+        return move_logits
 
 
 if __name__ == "__main__":
