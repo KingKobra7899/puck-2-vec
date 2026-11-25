@@ -4,17 +4,15 @@ from torchview import draw_graph
 
 
 class Puck2Vec(nn.Module):
-    def __init__(self, player_dim, n_frames, players_frame=11, transformer_dim=512, trans_layers=3, trans_heads=8, moves=11, *args, **kwargs) -> None:  # type: ignore
+    def __init__(self, n_frames, players_frame=11, transformer_dim=512, trans_layers=3, trans_heads=8, moves=11, *args, **kwargs) -> None:  # type: ignore
         super().__init__(*args, **kwargs)
         self.n_frames = n_frames
         self.d = transformer_dim
         self.moves = moves
         self.players_frame = players_frame
 
-        self.positional_embeddings = nn.Embedding(
-            5, player_dim
-        )  # typical embeddings for each position, lw, rw, c, d, g
-        pos_dim = player_dim + 2 + 3  # emb, x, y, [off, puck_x, puck_y]
+        pos_dim = 3  # x, y, off
+        look_dim = 5  # x + dx, y + dy, dx, dy, off
 
         self.position_mlp = nn.Sequential(
             nn.Linear(pos_dim, 128),
@@ -25,7 +23,7 @@ class Puck2Vec(nn.Module):
         )
 
         self.lookahead_mlp = nn.Sequential(
-            nn.Linear(pos_dim + 2, 128),
+            nn.Linear(look_dim, 128),
             nn.ReLU(),
             nn.Linear(128, 256),
             nn.ReLU(),
@@ -62,54 +60,24 @@ class Puck2Vec(nn.Module):
         )
         return mask
 
-    def encode(
-        self,
-        player_pos,
-        player_x,
-        player_y,
-        off,
-        player_dxs,
-        player_dys,
-        puck_x,
-        puck_y,
-    ):
-        emb = self.positional_embeddings(player_pos)  # e(p_k)
-        emb = emb[:, None].expand(-1, self.n_frames, -1, -1)
-        puck = torch.stack([puck_x, puck_y], -1)[:, :, None].expand(
-            -1, -1, self.players_frame, -1
-        )  # puck location, shared by every player in the frame
-        # off + puck = context h_{t,k}
+    def encode(self, player_x, player_y, off, player_dxs, player_dys):
         pos_token = self.position_mlp(
-            torch.cat([emb, torch.stack([player_x, player_y, off], -1), puck], -1)
+            torch.stack([player_x, player_y, off], -1)
         )  # z_{t,k}
         lookahead_token = self.lookahead_mlp(
-            torch.cat(
+            torch.stack(
                 [
-                    emb,
-                    torch.stack(
-                        [
-                            player_x + player_dxs,
-                            player_y + player_dys,
-                            player_dxs,
-                            player_dys,
-                            off,
-                        ],
-                        -1,
-                    ),
-                    puck,
+                    player_x + player_dxs,
+                    player_y + player_dys,
+                    player_dxs,
+                    player_dys,
+                    off,
                 ],
                 -1,
             )
         )  # u_{t,k}
         init_token = self.init_mlp(
-            torch.cat(
-                [
-                    emb[:, 0],
-                    torch.stack([player_x[:, 0], player_y[:, 0], off[:, 0]], -1),
-                    puck[:, 0],
-                ],
-                -1,
-            )
+            torch.stack([player_x[:, 0], player_y[:, 0], off[:, 0]], -1)
         )  # r_k
         frame = torch.stack([pos_token, lookahead_token], 3).flatten(
             2, 3
@@ -122,23 +90,9 @@ class Puck2Vec(nn.Module):
             -1, self.n_frames, K, 2, self.d
         )  # [B, T, K, pos|look, d]
 
-    def get_rink_state(
-        self,
-        playerIds,
-        player_pos,
-        player_x,
-        player_y,
-        off,
-        player_dxs,
-        player_dys,
-        puck_x,
-        puck_y,
-        pool="mean",
-    ):
+    def get_rink_state(self, player_x, player_y, off, player_dxs, player_dys, pool="mean"):
         # every player's pos_token at frame t = the model's read of the board at t
-        pos_out = self.encode(
-            player_pos, player_x, player_y, off, player_dxs, player_dys, puck_x, puck_y
-        )[
+        pos_out = self.encode(player_x, player_y, off, player_dxs, player_dys)[
             :, :, :, 0
         ]  # [B, T, K, d]
         if pool == "mean":
@@ -147,37 +101,18 @@ class Puck2Vec(nn.Module):
             return pos_out.flatten(2, 3)  # [B, T, K*d], players in input order
         return pos_out  # [B, T, K, d]
 
-    def forward(
-        self,
-        playerIds,
-        player_pos,
-        player_x,
-        player_y,
-        off,
-        player_dxs,
-        player_dys,
-        puck_x,
-        puck_y,
-    ):
-        pos_out = self.encode(
-            player_pos, player_x, player_y, off, player_dxs, player_dys, puck_x, puck_y
-        )[:, :, :, 0]
+    def forward(self, player_x, player_y, off, player_dxs, player_dys):
+        pos_out = self.encode(player_x, player_y, off, player_dxs, player_dys)[:, :, :, 0]
         move_logits = self.movement_head(pos_out)  # read moves off each pos_token
 
         return move_logits
 
 
 if __name__ == "__main__":
-    model = Puck2Vec(player_dim=32, n_frames=10, transformer_dim=256)
+    model = Puck2Vec(n_frames=10, transformer_dim=256)
 
     B, T, K = 8, 10, 11
-    inputs = (
-        torch.randint(0, 900, (B, K)),
-        torch.randint(0, 5, (B, K)),
-        *(torch.randn(B, T, K) for _ in range(5)),
-        torch.randn(B, T),
-        torch.randn(B, T),
-    )
+    inputs = tuple(torch.randn(B, T, K) for _ in range(5))
     g = draw_graph(
         model,
         input_data=inputs,

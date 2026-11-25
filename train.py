@@ -16,7 +16,6 @@ MAX_EPOCHS = 64
 PATIENCE = 5
 VAL_FRAC = 0.1
 N_FRAMES = 40
-PLAYER_DIM = 256
 TRANSFORMER_DIM = 512
 TRANS_LAYERS = 4
 TRANS_HEADS = 4
@@ -29,7 +28,7 @@ df = pd.read_csv("data/processed_ppt.csv")
 dataset = SeqDataset(df, n_frames=N_FRAMES)
 del df
 
-model = Puck2Vec(player_dim=PLAYER_DIM, n_frames=dataset.n_frames, transformer_dim=TRANSFORMER_DIM,
+model = Puck2Vec(n_frames=dataset.n_frames, transformer_dim=TRANSFORMER_DIM,
                  trans_layers=TRANS_LAYERS, trans_heads=TRANS_HEADS).to(DEVICE)
 
 torch.manual_seed(SEED)
@@ -43,10 +42,8 @@ opt = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
 def batch_loss(batch):
     b = {k: v.to(DEVICE, non_blocking=True) for k, v in batch.items()}
-    move_logits = model(playerIds=b["player_ids"], player_pos=b["player_pos"],
-                        player_x=b["x"], player_y=b["y"], off=b["off"],
-                        player_dxs=b["dx"], player_dys=b["dy"],
-                        puck_x=b["puck_x"], puck_y=b["puck_y"])
+    move_logits = model(player_x=b["x"], player_y=b["y"], off=b["off"],
+                        player_dxs=b["dx"], player_dys=b["dy"])
     return F.cross_entropy(move_logits.flatten(0, 2), b["move"].flatten())
 
 
