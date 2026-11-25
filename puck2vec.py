@@ -90,7 +90,9 @@ class Puck2Vec(nn.Module):
             -1, self.n_frames, K, 2, self.d
         )  # [B, T, K, pos|look, d]
 
-    def get_rink_state(self, player_x, player_y, off, player_dxs, player_dys, pool="mean"):
+    def get_rink_state(
+        self, player_x, player_y, off, player_dxs, player_dys, pool="mean"
+    ):
         # every player's pos_token at frame t = the model's read of the board at t
         pos_out = self.encode(player_x, player_y, off, player_dxs, player_dys)[
             :, :, :, 0
@@ -102,7 +104,9 @@ class Puck2Vec(nn.Module):
         return pos_out  # [B, T, K, d]
 
     def forward(self, player_x, player_y, off, player_dxs, player_dys):
-        pos_out = self.encode(player_x, player_y, off, player_dxs, player_dys)[:, :, :, 0]
+        pos_out = self.encode(player_x, player_y, off, player_dxs, player_dys)[
+            :, :, :, 0
+        ]
         move_logits = self.movement_head(pos_out)  # read moves off each pos_token
 
         return move_logits
