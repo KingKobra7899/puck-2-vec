@@ -1,4 +1,5 @@
 data/
 puck2vec.pth
 /.venv
+/img
 /__pycache__
